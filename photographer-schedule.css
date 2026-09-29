@@ -1,0 +1,273 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+    background-color: #f5f6fa;
+    color: #222;
+}
+
+/* Navbar Styling */
+.navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #1e1e24;
+    color: #fff;
+    padding: 12px 30px;
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.logo-box {
+    background: #fff;
+    color: #1e1e24;
+    font-weight: 800;
+    padding: 4px 8px;
+    font-size: 11px;
+    border-radius: 3px;
+}
+
+.portal-title {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.badge-pro {
+    background: #ff4757;
+    color: #fff;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: bold;
+}
+
+.navigation {
+    display: flex;
+    gap: 20px;
+}
+
+.navigation a {
+    color: #a4b0be;
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    padding: 6px 0;
+}
+
+.navigation a.active, .navigation a:hover {
+    color: #fff;
+    border-bottom: 2px solid #fff;
+}
+
+.nav-user-actions {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.icon-btn {
+    background: transparent;
+    border: none;
+    color: #a4b0be;
+    cursor: pointer;
+}
+
+.user-avatar {
+    width: 32px;
+    height: 32px;
+    background: #57606f;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: #fff;
+    font-size: 13px;
+}
+
+/* Page Layout */
+.page-container {
+    max-width: 1200px;
+    margin: 30px auto;
+    padding: 0 20px;
+}
+
+.page-header {
+    margin-bottom: 20px;
+}
+
+.page-title {
+    font-size: 22px;
+    font-weight: 700;
+}
+
+.page-subtitle {
+    font-size: 13px;
+    color: #747d8c;
+    margin-top: 4px;
+}
+
+.schedule-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 20px;
+}
+
+.side-column {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* Cards */
+.card {
+    background: #fff;
+    border: 1px solid #dcdde1;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+.card-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid #dcdde1;
+    background: #f8f9fa;
+}
+
+.card-header h2 {
+    font-size: 14px;
+    font-weight: 700;
+    color: #2f3542;
+}
+
+/* Tables */
+.table-container {
+    overflow-x: auto;
+}
+
+.schedule-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.schedule-table th {
+    background: #ffffff;
+    text-align: left;
+    padding: 12px 16px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #2f3542;
+    border-bottom: 1px solid #dcdde1;
+}
+
+.schedule-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid #f1f2f6;
+    vertical-align: middle;
+}
+
+.font-bold { font-weight: 600; }
+.subtext { font-size: 11px; color: #747d8c; margin-top: 2px; }
+
+.badge-event {
+    background: #f1f2f6;
+    color: #2f3542;
+    padding: 3px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+/* Form Styling */
+.form-block-date {
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.form-row {
+    display: flex;
+    gap: 10px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+}
+
+.form-group label {
+    font-size: 10px;
+    font-weight: 700;
+    color: #57606f;
+}
+
+.form-group input {
+    padding: 8px 10px;
+    border: 1px solid #dcdde1;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.btn-block {
+    background: #ff4757;
+    color: #fff;
+    border: none;
+    padding: 10px;
+    font-weight: 700;
+    font-size: 11px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 6px;
+}
+
+.btn-block:hover { background: #ff6b81; }
+
+/* Blocked List */
+.blocked-list {
+    list-style: none;
+    padding: 12px 18px;
+}
+
+.blocked-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #f1f2f6;
+}
+
+.blocked-item:last-child { border-bottom: none; }
+
+.btn-unblock {
+    color: #ff4757;
+    text-decoration: none;
+    font-size: 10px;
+    font-weight: 700;
+    border: 1px solid #ff4757;
+    padding: 4px 8px;
+    border-radius: 3px;
+}
+
+.btn-unblock:hover {
+    background: #ff4757;
+    color: #fff;
+}
+
+.empty-cell {
+    text-align: center;
+    padding: 20px;
+    color: #a4b0be;
+    font-size: 12px;
+}

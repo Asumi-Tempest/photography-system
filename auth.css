@@ -1,0 +1,268 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+body {
+    background-color: #ffffff;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    color: #1a1a1a;
+}
+
+/* Header Styling */
+.top-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 40px;
+    border-bottom: 2px solid #1a1a1a;
+    background: #ffffff;
+}
+
+.nav-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.nav-logo {
+    border: 2px solid #1a1a1a;
+    padding: 4px 12px;
+    font-weight: 800;
+    font-size: 14px;
+    letter-spacing: 1px;
+    transition: transform 0.2s ease, background-color 0.2s ease;
+    cursor: default;
+}
+
+.nav-logo:hover {
+    background-color: #1a1a1a;
+    color: #ffffff;
+}
+
+.portal-title {
+    font-size: 14px;
+    color: #666666;
+    font-weight: 500;
+}
+
+/* Navigation Links & Hover Animations */
+.nav-links {
+    display: flex;
+    gap: 28px;
+}
+
+.nav-links a {
+    text-decoration: none; /* Removed underline */
+    color: #1a1a1a;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    position: relative;
+    padding-bottom: 4px;
+    transition: color 0.2s ease;
+}
+
+.nav-links a::after {
+    content: '';
+    position: absolute;
+    width: 0%;
+    height: 2px;
+    bottom: 0;
+    left: 0;
+    background-color: #1a1a1a;
+    transition: width 0.25s ease-in-out;
+}
+
+.nav-links a:hover {
+    color: #000000;
+}
+
+.nav-links a:hover::after {
+    width: 100%; /* Smooth animated underline on hover */
+}
+
+/* Page Wrapper */
+.login-wrapper {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 40px 20px;
+    background-color: #fafafa;
+}
+
+/* Card Container */
+.auth-card {
+    background: #fcfcfc;
+    width: 100%;
+    max-width: 440px;
+    border: 2px solid #1a1a1a;
+    padding: 40px 36px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.auth-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.07);
+}
+
+.auth-header {
+    text-align: left;
+    margin-bottom: 28px;
+}
+
+.auth-header h1 {
+    font-size: 28px;
+    font-weight: 800;
+    color: #1a1a1a;
+    margin-bottom: 6px;
+}
+
+.auth-header p {
+    font-size: 13px;
+    color: #666666;
+}
+
+.alert-danger {
+    background: #f8d7da;
+    color: #842029;
+    border: 1px solid #f5c2c7;
+    font-size: 13px;
+    padding: 10px 12px;
+    margin-bottom: 20px;
+}
+
+/* Form Controls & Inputs */
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.form-group label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #1a1a1a;
+}
+
+.form-group input[type="email"],
+.form-group input[type="password"],
+.form-group input[type="text"],
+.form-group input[type="tel"] {
+    width: 100%;
+    padding: 12px 14px;
+    border: 2px solid #1a1a1a;
+    border-radius: 0;
+    font-size: 13px;
+    background: #ffffff;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.form-group input:hover {
+    background-color: #f9f9f9;
+}
+
+.form-group input:focus {
+    background-color: #ffffff;
+    box-shadow: 0 0 0 3px rgba(26, 26, 26, 0.15);
+}
+
+/* Options & Checkbox */
+.form-options {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    margin-top: 2px;
+}
+
+.remember-me {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    color: #555555;
+    transition: color 0.2s ease;
+}
+
+.remember-me:hover {
+    color: #1a1a1a;
+}
+
+.remember-me input {
+    width: 16px;
+    height: 16px;
+    border: 2px solid #1a1a1a;
+    accent-color: #222222;
+    cursor: pointer;
+}
+
+/* Links (No Underline by Default) */
+.forgot-link {
+    color: #1a1a1a;
+    font-weight: 700;
+    text-decoration: none; /* Removed underline */
+    position: relative;
+    transition: opacity 0.2s ease;
+}
+
+.forgot-link:hover {
+    opacity: 0.7;
+}
+
+/* Submit Button & Animations */
+.btn-submit {
+    background: #222222;
+    color: #ffffff;
+    border: 2px solid #222222;
+    padding: 14px;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    margin-top: 8px;
+    width: 100%;
+    transition: background-color 0.2s ease, color 0.2s ease, transform 0.1s ease;
+}
+
+.btn-submit:hover {
+    background: #000000;
+    border-color: #000000;
+    transform: translateY(-1px);
+}
+
+.btn-submit:active {
+    transform: translateY(0);
+}
+
+/* Footer Link Styling */
+.auth-footer {
+    text-align: center;
+    margin-top: 24px;
+    font-size: 13px;
+    color: #666666;
+}
+
+.auth-footer a {
+    color: #1a1a1a;
+    font-weight: 700;
+    text-decoration: none; /* Removed underline */
+    transition: opacity 0.2s ease;
+}
+
+.auth-footer a:hover {
+    opacity: 0.75;
+}

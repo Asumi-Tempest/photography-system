@@ -1,0 +1,285 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, Helvetica, sans-serif;
+    background: #ffffff;
+    color: #222222;
+    min-height: 100vh;
+}
+
+/* Global Transition */
+a, button {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* =========================
+   NAVIGATION
+========================= */
+
+.navbar {
+    height: 61px;
+    width: 100%;
+    border-bottom: 2px solid #222222;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 40px;
+    background: #ffffff;
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+
+.logo-box {
+    width: 79px;
+    height: 32px;
+    border: 2px solid #222222;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.brand span {
+    font-size: 14px;
+    color: #555555;
+}
+
+.navigation {
+    display: flex;
+    align-items: center;
+    gap: 35px;
+}
+
+.navigation a {
+    color: #222222;
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 400;
+    position: relative;
+    padding: 6px 12px;
+}
+
+/* Active Navigation Box Style */
+.navigation a.active {
+    border: 1.5px solid #222222;
+    font-weight: 700;
+}
+
+/* Slide-in underline animation for inactive nav items */
+.navigation a:not(.active)::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 2px;
+    bottom: 0;
+    left: 0;
+    background-color: #222222;
+    transition: width 0.25s ease-in-out;
+}
+
+.navigation a:not(.active):hover::after {
+    width: 100%;
+}
+
+/* =========================
+   SERVICES PAGE
+========================= */
+
+.services-page {
+    min-height: calc(100vh - 61px);
+    padding: 40px 48px;
+    border-left: 4px solid #222222;
+    border-right: 4px solid #222222;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.services-header {
+    margin-bottom: 30px;
+}
+
+.services-header h1 {
+    font-size: 32px;
+    font-weight: 700;
+    color: #222222;
+    margin-bottom: 8px;
+}
+
+.services-header p {
+    font-size: 14px;
+    color: #707070;
+}
+
+/* =========================
+   PACKAGES GRID
+========================= */
+
+.packages-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+}
+
+.package-card {
+    background: #f7f8f9;
+    border: 2px solid #333333;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 580px;
+}
+
+/* Wireframe Placeholder Box */
+.image-placeholder {
+    width: 100%;
+    height: 200px;
+    background: #f0f0f0;
+    border: 2px solid #333333;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+/* Wireframe Crossed Lines (X) */
+.placeholder-cross::before,
+.placeholder-cross::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 140%;
+    height: 1px;
+    background-color: #777777;
+}
+
+.placeholder-cross::before {
+    transform: translate(-50%, -50%) rotate(30deg);
+}
+
+.placeholder-cross::after {
+    transform: translate(-50%, -50%) rotate(-30deg);
+}
+
+.image-badge {
+    position: relative;
+    z-index: 1;
+    background: #ffffff;
+    border: 1px solid #333333;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #222222;
+}
+
+/* Package Content */
+.package-details {
+    padding: 20px 8px;
+    flex-grow: 1;
+}
+
+.package-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #222222;
+    margin-bottom: 4px;
+}
+
+.package-duration {
+    display: block;
+    font-size: 13px;
+    color: #707070;
+    margin-bottom: 16px;
+}
+
+.package-price {
+    font-size: 32px;
+    font-weight: 700;
+    color: #222222;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #e0e0e0;
+    margin-bottom: 20px;
+}
+
+.package-features {
+    list-style-type: disc;
+    padding-left: 20px;
+}
+
+.package-features li {
+    font-size: 13px;
+    color: #333333;
+    margin-bottom: 10px;
+    line-height: 1.4;
+}
+
+/* Request Button */
+.btn-request {
+    width: 100%;
+    height: 44px;
+    background: #222222;
+    color: #ffffff;
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #222222;
+    letter-spacing: 0.5px;
+}
+
+.btn-request:hover {
+    background: #000000;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+}
+
+.btn-request:active {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+/* =========================
+   RESPONSIVE STYLES
+========================= */
+
+@media (max-width: 992px) {
+    .packages-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 650px) {
+    .packages-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .services-page {
+        padding: 24px 20px;
+    }
+
+    .navbar {
+        flex-direction: column;
+        height: auto;
+        padding: 16px;
+        gap: 12px;
+    }
+
+    .navigation {
+        width: 100%;
+        justify-content: space-between;
+        gap: 10px;
+    }
+}
