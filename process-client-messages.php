@@ -8,26 +8,39 @@ if (!isset($_SESSION['user_id'])) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $db = getDBConnection();
-    $request_id  = intval($_POST['request_id'] ?? 0);
-    $amount_paid = floatval($_POST['amount'] ?? 0);
+    
+    $request_id = intval($_POST['request_id'] ?? 0);
+    $sender_id  = $_SESSION['user_id'];
+    $message    = trim($_POST['message'] ?? '');
 
-    if ($request_id > 0 && $amount_paid > 0) {
+    if ($request_id > 0 && !empty($message)) {
+        // Detect column name dynamically for message body (Message_Text vs Content)
+        $msgColumn = 'Message_Text';
+        try {
+            $checkCol = $db->query("SHOW COLUMNS FROM message LIKE 'Content'")->fetch();
+            if ($checkCol) {
+                $msgColumn = 'Content';
+            }
+        } catch (Exception $e) {
+            $msgColumn = 'Message_Text';
+        }
+
         try {
             $stmt = $db->prepare("
-                INSERT INTO payment (Request_ID, Amount_Paid, Payment_Date) 
-                VALUES (?, ?, NOW())
+                INSERT INTO message (Request_ID, Sender_ID, {$msgColumn}, Sent_At) 
+                VALUES (?, ?, ?, NOW())
             ");
-            $stmt->execute([$request_id, $amount_paid]);
+            $stmt->execute([$request_id, $sender_id, $message]);
 
-            header("Location: client-payments.php?success=" . urlencode("Payment of ₱" . number_format($amount_paid, 2) . " logged successfully!"));
+            header("Location: client-messages.php?request_id={$request_id}");
             exit;
         } catch (PDOException $e) {
-            header("Location: client-payments.php?error=" . urlencode("Failed to log payment: " . $e->getMessage()));
+            header("Location: client-messages.php?request_id={$request_id}&error=" . urlencode($e->getMessage()));
             exit;
         }
     }
 }
 
-header('Location: client-payments.php');
+header('Location: client-messages.php');
 exit;
 ?>

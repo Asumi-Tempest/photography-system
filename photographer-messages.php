@@ -1,60 +1,36 @@
 <?php
 require_once 'config.php';
 
-// Auth Guard
 if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
     exit;
 }
 
 $db = getDBConnection();
-$photographer_id = $_SESSION['user_id'];
-$active_request_id = intval($_GET['request_id'] ?? 0);
 
-// 1. Fetch active conversation threads (grouped by Service Request)
-$threads_query = "
-    SELECT 
-        sr.Request_ID,
-        c.Fullname AS client_name,
-        et.Name AS event_type,
-        (SELECT Message_Content FROM Message WHERE Request_ID = sr.Request_ID ORDER BY Message_ID DESC LIMIT 1) AS last_message,
-        (SELECT Sent_At FROM Message WHERE Request_ID = sr.Request_ID ORDER BY Message_ID DESC LIMIT 1) AS last_sent_at
-    FROM Service_Request sr
-    JOIN Client c ON sr.Client_ID = c.Client_ID
-    JOIN Event_Type et ON sr.Event_Type_ID = et.Event_Type_ID
-    ORDER BY last_sent_at DESC
-";
-$threads = $db->query($threads_query)->fetchAll();
+// Fetch all service requests with client emails for thread navigation
+$requests = $db->query("
+    SELECT sr.Request_ID, et.Name AS event_type, u.Email AS client_email
+    FROM service_request sr
+    LEFT JOIN event_type et ON sr.Event_Type_ID = et.Event_Type_ID
+    LEFT JOIN user u ON sr.Client_ID = u.User_ID
+    ORDER BY sr.Request_ID DESC
+")->fetchAll();
 
-// Default to first thread if no specific conversation is selected
-if ($active_request_id === 0 && !empty($threads)) {
-    $active_request_id = $threads[0]['Request_ID'];
-}
+$selected_request_id = intval($_GET['request_id'] ?? ($requests[0]['Request_ID'] ?? 0));
 
-// 2. Fetch active chat details & messages if a request is selected
-$active_client_name = '';
+// Fetch messages for selected request thread
 $messages = [];
-
-if ($active_request_id > 0) {
-    // Get client details for header
-    $client_stmt = $db->prepare("
-        SELECT c.Fullname 
-        FROM Service_Request sr 
-        JOIN Client c ON sr.Client_ID = c.Client_ID 
-        WHERE sr.Request_ID = ?
+if ($selected_request_id > 0) {
+    $stmt = $db->prepare("
+        SELECT m.*, u.Email AS sender_email, u.Role AS sender_role
+        FROM message m
+        LEFT JOIN user u ON m.Sender_ID = u.User_ID
+        WHERE m.Request_ID = ?
+        ORDER BY m.Sent_At ASC
     ");
-    $client_stmt->execute([$active_request_id]);
-    $active_client_name = $client_stmt->fetchColumn() ?: 'Client';
-
-    // Fetch messages for this request
-    $msg_stmt = $db->prepare("
-        SELECT Message_ID, Sender_Type, Message_Content, Sent_At 
-        FROM Message 
-        WHERE Request_ID = ? 
-        ORDER BY Sent_At ASC
-    ");
-    $msg_stmt->execute([$active_request_id]);
-    $messages = $msg_stmt->fetchAll();
+    $stmt->execute([$selected_request_id]);
+    $messages = $stmt->fetchAll();
 }
 ?>
 <!DOCTYPE html>
@@ -62,110 +38,91 @@ if ($active_request_id > 0) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Messages - Photographer Portal</title>
-    <link rel="stylesheet" href="photographer-messages.css">
+    <title>Client Messages - Photographer Portal</title>
+    <link rel="stylesheet" href="photographer-schedule.css">
+    <style>
+        .chat-container { display: flex; gap: 20px; background: white; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); min-height: 520px; padding: 20px; }
+        .threads-sidebar { width: 32%; border-right: 1px solid #edf2f7; padding-right: 15px; overflow-y: auto; max-height: 500px; }
+        .thread-item { display: block; padding: 12px; border-radius: 8px; text-decoration: none; color: #333; font-size: 13px; margin-bottom: 8px; background: #f9fafb; border: 1px solid #e5e7eb; }
+        .thread-item.active, .thread-item:hover { background: #2563eb; color: white; border-color: #2563eb; }
+        .thread-item.active small, .thread-item:hover small { color: #e0e7ff !important; }
+        .chat-box { width: 68%; display: flex; flex-direction: column; justify-content: space-between; }
+        .message-list { flex-grow: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 10px; max-height: 400px; }
+        .msg { max-width: 70%; padding: 10px 14px; border-radius: 10px; font-size: 14px; }
+        .msg-admin { align-self: flex-end; background: #2563eb; color: white; border-bottom-right-radius: 2px; }
+        .msg-client { align-self: flex-start; background: #f3f4f6; color: #111827; border-bottom-left-radius: 2px; }
+        .chat-input { display: flex; gap: 10px; margin-top: 15px; }
+        .chat-input input { flex-grow: 1; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; }
+        .chat-input button { background: #2563eb; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+    </style>
 </head>
 <body>
 
-    <!-- Header / Navigation Bar -->
     <header class="navbar">
         <div class="brand">
             <div class="logo-box">LOGO</div>
             <span class="portal-title">Photographer Portal</span>
-            <span class="badge-pro">PRO</span>
         </div>
 
         <nav class="navigation">
-            <a href="photographer-dashboard.php">DASHBOARD</a>
-            <a href="photographer-requests.php">REQUESTS</a>
-            <a href="photographer-schedule.php">SCHEDULE</a>
-            <a href="photographer-payments.php">PAYMENTS</a>
+            <a href="photographer-request.php">BOOKING REQUESTS</a>
             <a href="photographer-messages.php" class="active">MESSAGES</a>
+            <a href="photographer-payments.php">PAYMENTS</a>
+            <a href="photographer-schedule.php">SCHEDULE</a>
         </nav>
 
         <div class="nav-user-actions">
-            <button class="icon-btn" aria-label="Notifications">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-                </svg>
-            </button>
-            <div class="user-avatar">P</div>
+            <div class="user-avatar">A</div>
+            <a href="logout.php" class="logout-link">LOGOUT</a>
         </div>
     </header>
 
-    <!-- Page Body -->
     <main class="page-container">
+        <h2>Client Inquiries & Threads</h2>
 
-        <div class="chat-card">
-            
-            <!-- Left Panel: Conversation Threads -->
-            <div class="threads-panel">
-                <div class="panel-header">
-                    <h2>Conversations</h2>
-                </div>
-                <div class="threads-list">
-                    <?php if (!empty($threads)): ?>
-                        <?php foreach ($threads as $t): ?>
-                            <a href="photographer-messages.php?request_id=<?= $t['Request_ID'] ?>" 
-                               class="thread-item <?= ($t['Request_ID'] == $active_request_id) ? 'active' : '' ?>">
-                                <div class="thread-title">
-                                    <span class="font-bold"><?= htmlspecialchars($t['client_name']) ?></span>
-                                    <span class="thread-tag">#REQ-<?= str_pad($t['Request_ID'], 3, '0', STR_PAD_LEFT) ?></span>
-                                </div>
-                                <div class="thread-subtext"><?= htmlspecialchars($t['event_type']) ?></div>
-                                <div class="thread-preview">
-                                    <?= htmlspecialchars($t['last_message'] ?? 'No messages yet.') ?>
-                                </div>
-                            </a>
-                        <?php endforeach; ?>
-                    <?php else: ?>
-                        <div class="empty-state">No conversations found.</div>
-                    <?php endif; ?>
-                </div>
-            </div>
-
-            <!-- Right Panel: Active Chat Window -->
-            <div class="chat-panel">
-                <?php if ($active_request_id > 0): ?>
-                    
-                    <div class="panel-header chat-header">
-                        <h2>Chat with <?= htmlspecialchars($active_client_name) ?></h2>
-                        <span class="req-badge">Request #REQ-<?= str_pad($active_request_id, 3, '0', STR_PAD_LEFT) ?></span>
-                    </div>
-
-                    <div class="chat-messages">
-                        <?php if (!empty($messages)): ?>
-                            <?php foreach ($messages as $m): ?>
-                                <?php $is_photographer = ($m['Sender_Type'] === 'Photographer'); ?>
-                                <div class="message-bubble-wrapper <?= $is_photographer ? 'outgoing' : 'incoming' ?>">
-                                    <div class="message-bubble">
-                                        <p><?= nl2br(htmlspecialchars($m['Message_Content'])) ?></p>
-                                        <span class="message-time"><?= date('h:i A, M d', strtotime($m['Sent_At'])) ?></span>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <div class="empty-state">Start the conversation by sending a message below.</div>
-                        <?php endif; ?>
-                    </div>
-
-                    <!-- Reply Form -->
-                    <form action="process-message.php" method="POST" class="chat-input-area">
-                        <input type="hidden" name="request_id" value="<?= $active_request_id ?>">
-                        <input type="text" name="message_content" placeholder="Type your message here..." required autocomplete="off">
-                        <button type="submit" class="btn-send">SEND</button>
-                    </form>
-
+        <div class="chat-container">
+            <div class="threads-sidebar">
+                <h4 style="margin-top: 0; color: #6b7280; font-size: 12px; text-transform: uppercase;">All Booking Conversations</h4>
+                <?php if (!empty($requests)): ?>
+                    <?php foreach ($requests as $req): ?>
+                        <a href="photographer-messages.php?request_id=<?= $req['Request_ID'] ?>" class="thread-item <?= $req['Request_ID'] == $selected_request_id ? 'active' : '' ?>">
+                            <strong>#REQ-<?= str_pad($req['Request_ID'], 3, '0', STR_PAD_LEFT) ?></strong> - <?= htmlspecialchars($req['event_type'] ?? 'Booking') ?><br>
+                            <small style="color: #6b7280;"><?= htmlspecialchars($req['client_email'] ?? 'Client') ?></small>
+                        </a>
+                    <?php endforeach; ?>
                 <?php else: ?>
-                    <div class="empty-state flex-center">
-                        <p>Select a client conversation from the left to view messages.</p>
-                    </div>
+                    <p style="font-size: 13px; color: #6b7280;">No booking threads found.</p>
                 <?php endif; ?>
             </div>
 
-        </div>
+            <div class="chat-box">
+                <?php if ($selected_request_id > 0): ?>
+                    <div class="message-list">
+                        <?php if (!empty($messages)): ?>
+                            <?php foreach ($messages as $msg): ?>
+                                <?php $is_admin = ($msg['Sender_ID'] == $_SESSION['user_id']); ?>
+                                <div class="msg <?= $is_admin ? 'msg-admin' : 'msg-client' ?>">
+                                    <small style="display: block; font-size: 10px; opacity: 0.8; margin-bottom: 2px;">
+                                        <?= $is_admin ? 'You (Photographer)' : htmlspecialchars($msg['sender_email'] ?? 'Client') ?> • <?= date('M d, h:i A', strtotime($msg['Sent_At'])) ?>
+                                    </small>
+                                    <?= htmlspecialchars($msg['Message_Text'] ?? $msg['Content'] ?? '') ?>
+                                </div>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <p style="text-align: center; color: #6b7280; margin: auto;">No messages in this thread yet. Send a reply below!</p>
+                        <?php endif; ?>
+                    </div>
 
+                    <form action="process-admin-messages.php" method="POST" class="chat-input">
+                        <input type="hidden" name="request_id" value="<?= $selected_request_id ?>">
+                        <input type="text" name="message" placeholder="Reply to client..." required autocomplete="off">
+                        <button type="submit">Send Reply</button>
+                    </form>
+                <?php else: ?>
+                    <p style="text-align: center; color: #6b7280; margin: auto;">Select a request thread from the left sidebar to view messages.</p>
+                <?php endif; ?>
+            </div>
+        </div>
     </main>
 
 </body>

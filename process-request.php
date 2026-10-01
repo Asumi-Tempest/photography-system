@@ -1,31 +1,35 @@
 <?php
 require_once 'config.php';
 
-// Auth Guard
 if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
     exit;
 }
 
-$id = intval($_GET['id'] ?? 0);
-$action = $_GET['action'] ?? '';
-
-if ($id > 0 && in_array($action, ['approve', 'reject'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $db = getDBConnection();
+    
+    $request_id = intval($_POST['request_id'] ?? 0);
+    $status_id  = intval($_POST['status_id'] ?? 0);
 
-    // Map actions to Request_Status lookup table:
-    // Request_Status_ID: 1 = Pending, 2 = Confirmed, 3 = Rejected, 4 = Completed
-    $new_status_id = ($action === 'approve') ? 2 : 3;
+    if ($request_id > 0 && $status_id > 0) {
+        try {
+            $stmt = $db->prepare("
+                UPDATE service_request 
+                SET Request_Status_ID = ? 
+                WHERE Request_ID = ?
+            ");
+            $stmt->execute([$status_id, $request_id]);
 
-    $stmt = $db->prepare("
-        UPDATE Service_Request 
-        SET Request_Status_ID = ? 
-        WHERE Request_ID = ?
-    ");
-    $stmt->execute([$new_status_id, $id]);
+            header("Location: photographer-request.php?success=" . urlencode("Booking status updated successfully!"));
+            exit;
+        } catch (PDOException $e) {
+            header("Location: photographer-request.php?error=" . urlencode("Failed to update status: " . $e->getMessage()));
+            exit;
+        }
+    }
 }
 
-// Redirect back to request monitoring page
-header('Location: photographer-requests.php');
+header('Location: photographer-request.php');
 exit;
 ?>

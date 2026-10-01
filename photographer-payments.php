@@ -8,36 +8,78 @@ if (!isset($_SESSION['user_id'])) {
 
 $db = getDBConnection();
 
-// Fetch overall summary stats
-$total_revenue = $db->query("SELECT COALESCE(SUM(Amount_Paid), 0) AS revenue FROM payment")->fetch()['revenue'];
-$total_transactions = $db->query("SELECT COUNT(*) AS total FROM payment")->fetch()['total'];
+// Detect payment amount column dynamically
+$paymentColumn = 'Amount';
+try {
+    $checkCol = $db->query("SHOW COLUMNS FROM payment LIKE 'Amount_Paid'")->fetch();
+    if ($checkCol) {
+        $paymentColumn = 'Amount_Paid';
+    }
+} catch (Exception $e) {
+    $paymentColumn = 'Amount';
+}
 
-// Fetch detailed payment history
-$payments = $db->query("
+// Fetch all payments with request and client information
+$query = "
     SELECT 
         p.Payment_ID,
         p.Request_ID,
-        p.Amount_Paid,
+        p.{$paymentColumn} AS payment_amount,
         p.Payment_Date,
+        pm.Method_Name,
         u.Email AS client_email,
         et.Name AS event_type,
-        pkg.Name AS package_name,
-        pkg.Price AS package_price
+        pkg.Price AS total_package_price
     FROM payment p
-    INNER JOIN service_request sr ON p.Request_ID = sr.Request_ID
+    LEFT JOIN service_request sr ON p.Request_ID = sr.Request_ID
     LEFT JOIN user u ON sr.Client_ID = u.User_ID
     LEFT JOIN event_type et ON sr.Event_Type_ID = et.Event_Type_ID
     LEFT JOIN package pkg ON sr.Package_ID = pkg.Package_ID
+    LEFT JOIN payment_method pm ON p.Payment_Method_ID = pm.Payment_Method_ID
     ORDER BY p.Payment_Date DESC
-")->fetchAll();
+";
+
+$payments = $db->query($query)->fetchAll();
+
+// Calculate total revenue collected
+$totalRevenue = 0;
+foreach ($payments as $pay) {
+    $totalRevenue += floatval($pay['payment_amount']);
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Payment Records - Admin Portal</title>
-    <link rel="stylesheet" href="photographer-payments.css">
+    <title>Payment Records - Photographer Portal</title>
+    <link rel="stylesheet" href="photographer-schedule.css">
+    <style>
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .stat-title {
+            font-size: 13px;
+            color: #6b7280;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #111827;
+            margin-top: 8px;
+        }
+    </style>
 </head>
 <body>
 
@@ -61,16 +103,16 @@ $payments = $db->query("
     </header>
 
     <main class="page-container">
-        <h2>Payment Records & Revenue</h2>
+        <h2>Payment Records & Revenue Summary</h2>
 
         <div class="stats-grid">
             <div class="stat-card">
-                <span class="stat-label">Total Revenue Collected</span>
-                <span class="stat-value">₱<?= number_format($total_revenue, 2) ?></span>
+                <div class="stat-title">Total Revenue Collected</div>
+                <div class="stat-value" style="color: #16a34a;">₱<?= number_format($totalRevenue, 2) ?></div>
             </div>
             <div class="stat-card">
-                <span class="stat-label">Total Transactions</span>
-                <span class="stat-value"><?= number_format($total_transactions) ?></span>
+                <div class="stat-title">Total Transactions</div>
+                <div class="stat-value"><?= count($payments) ?></div>
             </div>
         </div>
 
@@ -78,12 +120,13 @@ $payments = $db->query("
             <table>
                 <thead>
                     <tr>
-                        <th>Transaction #</th>
+                        <th>Payment #</th>
                         <th>Req #</th>
-                        <th>Client Email</th>
-                        <th>Event & Package</th>
+                        <th>Client</th>
+                        <th>Event</th>
+                        <th>Method</th>
                         <th>Amount Paid</th>
-                        <th>Payment Date</th>
+                        <th>Date & Time</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -93,20 +136,15 @@ $payments = $db->query("
                                 <td><strong>#PAY-<?= str_pad($p['Payment_ID'], 4, '0', STR_PAD_LEFT) ?></strong></td>
                                 <td>#REQ-<?= str_pad($p['Request_ID'], 3, '0', STR_PAD_LEFT) ?></td>
                                 <td><?= htmlspecialchars($p['client_email'] ?? 'Client') ?></td>
-                                <td>
-                                    <strong><?= htmlspecialchars($p['event_type'] ?? 'N/A') ?></strong><br>
-                                    <small style="color: #6b7280;"><?= htmlspecialchars($p['package_name'] ?? '') ?> (₱<?= number_format($p['package_price'] ?? 0, 2) ?>)</small>
-                                </td>
-                                <td><strong style="color: #10b981;">₱<?= number_format($p['Amount_Paid'], 2) ?></strong></td>
-                                <td>
-                                    <?= date('M d, Y', strtotime($p['Payment_Date'])) ?><br>
-                                    <small style="color: #6b7280;"><?= date('h:i A', strtotime($p['Payment_Date'])) ?></small>
-                                </td>
+                                <td><?= htmlspecialchars($p['event_type'] ?? 'N/A') ?></td>
+                                <td><span style="background: #e0f2fe; color: #0369a1; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 12px;"><?= htmlspecialchars($p['Method_Name'] ?? 'Cash/Online') ?></span></td>
+                                <td><strong style="color: #16a34a;">₱<?= number_format($p['payment_amount'], 2) ?></strong></td>
+                                <td><?= date('M d, Y - h:i A', strtotime($p['Payment_Date'])) ?></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="6" style="text-align: center; color: #6b7280;">No payment transactions recorded yet.</td>
+                            <td colspan="7" style="text-align: center; color: #6b7280;">No payment transactions recorded yet.</td>
                         </tr>
                     <?php endif; ?>
                 </tbody>

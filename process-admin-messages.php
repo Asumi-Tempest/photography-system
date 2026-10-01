@@ -8,26 +8,39 @@ if (!isset($_SESSION['user_id'])) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $db = getDBConnection();
+    
     $request_id = intval($_POST['request_id'] ?? 0);
+    $sender_id  = $_SESSION['user_id'];
     $message    = trim($_POST['message'] ?? '');
 
     if ($request_id > 0 && !empty($message)) {
+        // Dynamic column detection for message body (Message_Text vs Content)
+        $msgColumn = 'Message_Text';
+        try {
+            $checkCol = $db->query("SHOW COLUMNS FROM message LIKE 'Content'")->fetch();
+            if ($checkCol) {
+                $msgColumn = 'Content';
+            }
+        } catch (Exception $e) {
+            $msgColumn = 'Message_Text';
+        }
+
         try {
             $stmt = $db->prepare("
-                INSERT INTO message (Request_ID, Sender, Message, Date_Sent) 
-                VALUES (?, 'Photographer', ?, NOW())
+                INSERT INTO message (Request_ID, Sender_ID, {$msgColumn}, Sent_At) 
+                VALUES (?, ?, ?, NOW())
             ");
-            $stmt->execute([$request_id, $message]);
+            $stmt->execute([$request_id, $sender_id, $message]);
 
-            header("Location: admin-messages.php?request_id={$request_id}&msg_sent=1");
+            header("Location: photographer-messages.php?request_id={$request_id}");
             exit;
         } catch (PDOException $e) {
-            header("Location: admin-messages.php?request_id={$request_id}&error=" . urlencode($e->getMessage()));
+            header("Location: photographer-messages.php?request_id={$request_id}&error=" . urlencode($e->getMessage()));
             exit;
         }
     }
 }
 
-header('Location: admin-messages.php');
+header('Location: photographer-messages.php');
 exit;
 ?>
