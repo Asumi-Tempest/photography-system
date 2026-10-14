@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Studio logo">
+  <rect width="64" height="64" rx="14" fill="#6b7280"/>
+  <path d="M13 25a4 4 0 0 1 4-4h4.5l2.8-5h15.4l2.8 5H47a4 4 0 0 1 4 4v20a4 4 0 0 1-4 4H17a4 4 0 0 1-4-4z" fill="#ffffff"/>
+  <circle cx="32" cy="35" r="10.5" fill="#6b7280"/>
+  <circle cx="32" cy="35" r="6.5" fill="#ffffff"/>
+  <circle cx="32" cy="35" r="3" fill="#1e1e2d"/>
+  <circle cx="45" cy="27.5" r="1.8" fill="#6b7280"/>
+</svg>
