@@ -25,4 +25,25 @@ function getDBConnection() {
 if (!isset($_SESSION['mock_blocked_dates'])) {
     $_SESSION['mock_blocked_dates'] = [];
 }
+
+// ---- Access-control helpers (added) ----
+// Only Admin / Photographer accounts may use staff pages.
+function requireStaff() {
+    if (!isset($_SESSION['user_id'])) {
+        header('Location: login.php');
+        exit;
+    }
+    $role = strtolower($_SESSION['user_role'] ?? '');
+    if ($role !== 'admin' && $role !== 'photographer') {
+        header('Location: client-request.php');
+        exit;
+    }
+}
+
+// True if the service request belongs to the logged-in client.
+function clientOwnsRequest($db, $requestId) {
+    $stmt = $db->prepare("SELECT 1 FROM service_request WHERE Request_ID = ? AND Client_ID = ?");
+    $stmt->execute([$requestId, $_SESSION['user_id'] ?? 0]);
+    return (bool)$stmt->fetchColumn();
+}
 ?>

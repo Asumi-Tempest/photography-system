@@ -1,37 +1,72 @@
 <?php
 require_once 'config.php';
 
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
     exit;
 }
 
 $db = getDBConnection();
-$client_id = $_SESSION['user_id'];
+$currentUserId = $_SESSION['user_id'];
+$errorMessage = '';
+$successMessage = '';
 
-// Fetch client requests for message thread selection
-$requests = $db->query("
-    SELECT sr.Request_ID, et.Name AS event_type 
-    FROM service_request sr 
-    LEFT JOIN event_type et ON sr.Event_Type_ID = et.Event_Type_ID 
-    WHERE sr.Client_ID = {$client_id}
-    ORDER BY sr.Request_ID DESC
-")->fetchAll();
+// Get client's latest active Request_ID
+$activeRequestId = null;
+try {
+    $reqStmt = $db->prepare("SELECT Request_ID FROM service_request WHERE Client_ID = :uid ORDER BY Request_ID DESC LIMIT 1");
+    $reqStmt->execute(['uid' => $currentUserId]);
+    $reqRow = $reqStmt->fetch(PDO::FETCH_ASSOC);
+    if ($reqRow) {
+        $activeRequestId = $reqRow['Request_ID'];
+    }
+} catch (Exception $e) {
+    $errorMessage = "Error fetching request context: " . $e->getMessage();
+}
 
-$selected_request_id = intval($_GET['request_id'] ?? ($requests[0]['Request_ID'] ?? 0));
+// Handle Message Submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'send_message') {
+    $messageText = trim($_POST['message'] ?? '');
 
-// Fetch message thread for selected request
+    if (empty($messageText)) {
+        $errorMessage = "Message content cannot be empty.";
+    } elseif (!$activeRequestId) {
+        $errorMessage = "You must submit a booking request before sending messages.";
+    } else {
+        try {
+            $insertStmt = $db->prepare("
+                INSERT INTO message (Request_ID, Sender, Message_Text, Date_Sent, Message_Status)
+                VALUES (:req_id, 'Client', :msg, NOW(), 'Unread')
+            ");
+            $insertStmt->execute([
+                'req_id' => $activeRequestId,
+                'msg'    => $messageText
+            ]);
+            $successMessage = "Message sent successfully!";
+        } catch (PDOException $e) {
+            $errorMessage = "Database Error: " . $e->getMessage();
+        }
+    }
+}
+
+// Fetch conversation history for this client's booking requests
 $messages = [];
-if ($selected_request_id > 0) {
+try {
     $stmt = $db->prepare("
-        SELECT m.*, u.Email AS sender_email, u.Role AS sender_role
+        SELECT m.* 
         FROM message m
-        LEFT JOIN user u ON m.Sender_ID = u.User_ID
-        WHERE m.Request_ID = ?
-        ORDER BY m.Sent_At ASC
+        INNER JOIN service_request sr ON m.Request_ID = sr.Request_ID
+        WHERE sr.Client_ID = :uid
+        ORDER BY m.Message_ID ASC
     ");
-    $stmt->execute([$selected_request_id]);
-    $messages = $stmt->fetchAll();
+    $stmt->execute(['uid' => $currentUserId]);
+    $messages = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {
+    $errorMessage = "Query Error: " . $e->getMessage();
 }
 ?>
 <!DOCTYPE html>
@@ -40,86 +75,86 @@ if ($selected_request_id > 0) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Messages - Client Portal</title>
-    <link rel="stylesheet" href="client-messages.css">
+    <link rel="stylesheet" href="auth.css">
     <style>
-        .chat-container { display: flex; gap: 20px; background: white; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); min-height: 500px; padding: 20px; }
-        .threads-sidebar { width: 30%; border-right: 1px solid #edf2f7; padding-right: 15px; }
-        .thread-item { display: block; padding: 12px; border-radius: 8px; text-decoration: none; color: #333; font-weight: 600; margin-bottom: 8px; background: #f9fafb; }
-        .thread-item.active, .thread-item:hover { background: #2563eb; color: white; }
-        .chat-box { width: 70%; display: flex; flex-direction: column; justify-content: space-between; }
-        .message-list { flex-grow: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 10px; max-height: 400px; }
-        .msg { max-width: 70%; padding: 10px 14px; border-radius: 10px; font-size: 14px; }
-        .msg-client { align-self: flex-end; background: #2563eb; color: white; border-bottom-right-radius: 2px; }
-        .msg-admin { align-self: flex-start; background: #e5e7eb; color: #111827; border-bottom-left-radius: 2px; }
-        .chat-input { display: flex; gap: 10px; margin-top: 15px; }
-        .chat-input input { flex-grow: 1; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; }
-        .chat-input button { background: #2563eb; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        body { background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; }
+        .top-nav { background: #1e1e2d; color: #fff; padding: 14px 40px; display: flex; align-items: center; justify-content: space-between; }
+        .nav-left { display: flex; align-items: center; gap: 12px; }
+        .portal-title { font-weight: 700; font-size: 15px; color: #ffffff; letter-spacing: 0.2px; }
+        .nav-links { display: flex.gap: 20px; align-items: center; }
+        .nav-links a { font-size: 11px; font-weight: 700; color: #92929f; text-decoration: none; letter-spacing: 0.8px; text-transform: uppercase; transition: color 0.2s; position: relative; padding-bottom: 4px; margin-right: 15px; }
+        .nav-links a:hover { color: #ffffff; }
+        .nav-links a.active { color: #ffffff; border-bottom: 2px solid #ffffff; }
+        .nav-right { display: flex; align-items: center; gap: 14px; }
+        .user-avatar { width: 32px; height: 32px; background: #3b82f6; color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; }
+        .btn-logout { font-size: 13px; font-weight: 700; color: #f87171; text-decoration: none; }
+        .portal-container { max-width: 900px; margin: 36px auto; padding: 0 20px; }
+        .page-title { font-size: 26px; font-weight: 800; color: #0f172a; margin-bottom: 24px; text-align: center; }
+        .chat-card { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); border: 1px solid #e2e8f0; }
+        .chat-box { min-height: 250px; max-height: 400px; overflow-y: auto; padding: 16px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fafafa; margin-bottom: 20px; display: flex; flex-direction: column; gap: 12px; }
+        .message-bubble { max-width: 75%; padding: 10px 14px; border-radius: 10px; font-size: 14px; line-height: 1.4; }
+        .msg-client { background: #2563eb; color: #fff; align-self: flex-end; border-bottom-right-radius: 2px; }
+        .msg-admin { background: #e2e8f0; color: #0f172a; align-self: flex-start; border-bottom-left-radius: 2px; }
+        .msg-date { font-size: 10px; opacity: 0.75; margin-top: 4px; text-align: right; display: block; }
+        .chat-form { display: flex; gap: 10px; }
+        .chat-input { flex: 1; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; outline: none; }
+        .btn-send { background: #2563eb; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 700; cursor: pointer; }
+        .alert-error { background: #fee2e2; border: 1px solid #fca5a5; color: #991b1b; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; font-weight: 600; }
+        .alert-success { background: #dcfce7; border: 1px solid #86efac; color: #166534; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; font-weight: 600; }
     </style>
 </head>
 <body>
 
-    <header class="navbar">
-        <div class="brand">
-            <div class="logo-box">LOGO</div>
+    <header class="top-nav">
+        <div class="nav-left">
+            <img src="logo.svg" alt="Logo" width="34" height="34" style="display:block;width:34px;height:34px;">
             <span class="portal-title">Client Portal</span>
         </div>
-
-        <nav class="navigation">
-            <a href="client-request.php">BOOK EVENT</a>
-            <a href="client-messages.php" class="active">MESSAGES</a>
+        <nav class="nav-links">
+            <a href="client-services.php">SERVICES</a>
+            <a href="client-request.php">BOOK SERVICE</a>
             <a href="client-payments.php">MY PAYMENTS</a>
+            <a href="client-deliverables.php">GALLERY</a>
+            <a href="client-reviews.php">REVIEWS</a>
+            <a href="client-messages.php" class="active">MESSAGES</a>
         </nav>
-
-        <div class="nav-user-actions">
+        <div class="nav-right">
             <div class="user-avatar">C</div>
-            <a href="logout.php" class="logout-link">LOGOUT</a>
+            <a href="logout.php" class="btn-logout">Logout</a>
         </div>
     </header>
 
-    <main class="page-container" style="max-width: 1200px; margin: 30px auto; padding: 0 20px;">
-        <h2>Booking Conversations</h2>
+    <main class="portal-container">
+        <h1 class="page-title">Client Support Messages</h1>
 
-        <div class="chat-container">
-            <div class="threads-sidebar">
-                <h4 style="margin-top: 0; color: #6b7280; font-size: 12px; text-transform: uppercase;">Your Requests</h4>
-                <?php if (!empty($requests)): ?>
-                    <?php foreach ($requests as $req): ?>
-                        <a href="client-messages.php?request_id=<?= $req['Request_ID'] ?>" class="thread-item <?= $req['Request_ID'] == $selected_request_id ? 'active' : '' ?>">
-                            #REQ-<?= str_pad($req['Request_ID'], 3, '0', STR_PAD_LEFT) ?> - <?= htmlspecialchars($req['event_type'] ?? 'Booking') ?>
-                        </a>
+        <?php if (!empty($errorMessage)): ?>
+            <div class="alert-error">⚠️ <?= htmlspecialchars($errorMessage) ?></div>
+        <?php endif; ?>
+
+        <?php if (!empty($successMessage)): ?>
+            <div class="alert-success">✓ <?= htmlspecialchars($successMessage) ?></div>
+        <?php endif; ?>
+
+        <div class="chat-card">
+            <div class="chat-box">
+                <?php if (!empty($messages)): ?>
+                    <?php foreach ($messages as $msg): ?>
+                        <?php $isClient = strcasecmp($msg['Sender'], 'Client') === 0; ?>
+                        <div class="message-bubble <?= $isClient ? 'msg-client' : 'msg-admin' ?>">
+                            <?= htmlspecialchars($msg['Message_Text'] ?? $msg['Message'] ?? '') ?>
+                            <span class="msg-date"><?= date('M d, g:i a', strtotime($msg['Date_Sent'])) ?></span>
+                        </div>
                     <?php endforeach; ?>
                 <?php else: ?>
-                    <p style="font-size: 13px; color: #6b7280;">No active requests.</p>
+                    <p style="text-align: center; color: #64748b; font-size: 13px; margin: auto;">No message history found. Send a message to get in touch!</p>
                 <?php endif; ?>
             </div>
 
-            <div class="chat-box">
-                <?php if ($selected_request_id > 0): ?>
-                    <div class="message-list">
-                        <?php if (!empty($messages)): ?>
-                            <?php foreach ($messages as $msg): ?>
-                                <?php $is_client = ($msg['Sender_ID'] == $client_id); ?>
-                                <div class="msg <?= $is_client ? 'msg-client' : 'msg-admin' ?>">
-                                    <small style="display: block; font-size: 10px; opacity: 0.8; margin-bottom: 2px;">
-                                        <?= $is_client ? 'You' : 'Photographer' ?> • <?= date('M d, h:i A', strtotime($msg['Sent_At'])) ?>
-                                    </small>
-                                    <?= htmlspecialchars($msg['Message_Text'] ?? $msg['Content'] ?? '') ?>
-                                </div>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <p style="text-align: center; color: #6b7280; margin-auto: 0;">No messages in this conversation yet. Send a inquiry below!</p>
-                        <?php endif; ?>
-                    </div>
-
-                    <form action="process-client-messages.php" method="POST" class="chat-input">
-                        <input type="hidden" name="request_id" value="<?= $selected_request_id ?>">
-                        <input type="text" name="message" placeholder="Type your message..." required autocomplete="off">
-                        <button type="submit">Send</button>
-                    </form>
-                <?php else: ?>
-                    <p style="text-align: center; color: #6b7280; margin: auto;">Select a booking request from the sidebar to view messages.</p>
-                <?php endif; ?>
-            </div>
+            <form method="POST" class="chat-form">
+                <input type="hidden" name="action" value="send_message">
+                <input type="text" name="message" class="chat-input" placeholder="Type your message here..." required>
+                <button type="submit" class="btn-send">Send</button>
+            </form>
         </div>
     </main>
 

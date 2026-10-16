@@ -2,8 +2,8 @@
 require_once 'config.php';
 
 if (isset($_SESSION['user_id'])) {
-    if ($_SESSION['user_role'] === 'Admin' || $_SESSION['user_role'] === 'Photographer') {
-        header('Location: admin-dashboard.php');
+    if (isset($_SESSION['user_role']) && ($_SESSION['user_role'] === 'Admin' || $_SESSION['user_role'] === 'Photographer')) {
+        header('Location: photographer-dashboard.php');
     } else {
         header('Location: client-request.php');
     }
@@ -22,18 +22,12 @@ $error = $_GET['error'] ?? '';
 </head>
 <body>
 
-    <!-- Persistent Top Navigation Bar -->
+    <!-- Top Navigation Bar (Unused links removed) -->
     <header class="top-nav">
         <div class="nav-left">
-            <div class="nav-logo">LOGO</div>
+            <img src="logo.svg" alt="Logo" width="34" height="34" style="display:block;width:34px;height:34px;">
             <span class="portal-title">Client Portal</span>
         </div>
-        <nav class="nav-links">
-            <a href="#">HOME</a>
-            <a href="#">SERVICES</a>
-            <a href="#">ABOUT</a>
-            <a href="#">CONTACT</a>
-        </nav>
     </header>
 
     <!-- Main Content Container -->

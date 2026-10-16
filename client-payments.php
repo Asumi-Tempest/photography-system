@@ -1,152 +1,217 @@
 <?php
 require_once 'config.php';
 
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
     exit;
 }
 
 $db = getDBConnection();
-$client_id = $_SESSION['user_id'];
+$currentUserId = $_SESSION['user_id'];
+$errorMessage = '';
+$successMessage = '';
 
-// Fetch available payment methods
-$payment_methods = $db->query("SELECT * FROM payment_method ORDER BY Payment_Method_ID ASC")->fetchAll();
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'submit_payment') {
+    $requestId = intval($_POST['request_id'] ?? 0);
+    $amount = floatval($_POST['amount'] ?? 0);
+    $methodName = trim($_POST['method'] ?? 'GCash');
 
-// Detect payment column name dynamically to avoid Unknown Column errors
-$paymentColumn = 'Amount';
-try {
-    $checkCol = $db->query("SHOW COLUMNS FROM payment LIKE 'Amount_Paid'")->fetch();
-    if ($checkCol) {
-        $paymentColumn = 'Amount_Paid';
+    if ($requestId <= 0 || $amount <= 0) {
+        $errorMessage = "Please enter a valid payment amount.";
+    } elseif (!clientOwnsRequest($db, $requestId)) {
+        $errorMessage = "Invalid booking selected.";
+    } else {
+        try {
+            $methodStmt = $db->prepare("SELECT Payment_Method_ID FROM payment_method WHERE LOWER(Method_Name) LIKE :m LIMIT 1");
+            $methodStmt->execute(['m' => '%' . strtolower($methodName) . '%']);
+            $methodRow = $methodStmt->fetch();
+            $methodId = $methodRow ? $methodRow['Payment_Method_ID'] : 1;
+
+            $statusRow = $db->query("SELECT Payment_Status_ID FROM payment_status WHERE LOWER(Status_Name) IN ('pending', 'unverified') LIMIT 1")->fetch();
+            $statusId = $statusRow ? $statusRow['Payment_Status_ID'] : 1;
+
+            $insertStmt = $db->prepare("
+                INSERT INTO payment (Request_ID, Amount, Payment_Method_ID, Payment_Status_ID, Payment_Date)
+                VALUES (:req_id, :amount, :method_id, :status_id, NOW())
+            ");
+            $insertStmt->execute([
+                'req_id'    => $requestId,
+                'amount'    => $amount,
+                'method_id' => $methodId,
+                'status_id' => $statusId
+            ]);
+
+            $successMessage = "Payment of ₱" . number_format($amount, 2) . " submitted for verification!";
+        } catch (PDOException $e) {
+            $errorMessage = "Database Error: " . $e->getMessage();
+        }
     }
-} catch (Exception $e) {
-    $paymentColumn = 'Amount';
 }
 
-// Fetch client service requests and total payments made
-$stmt = $db->prepare("
-    SELECT 
-        sr.Request_ID,
-        sr.Preferred_Date,
-        sr.Preferred_Time,
-        et.Name AS event_type,
-        pkg.Name AS package_name,
-        pkg.Price AS package_price,
-        rs.Status_Name AS request_status,
-        COALESCE(SUM(p.{$paymentColumn}), 0) AS total_paid
-    FROM service_request sr
-    LEFT JOIN event_type et ON sr.Event_Type_ID = et.Event_Type_ID
-    LEFT JOIN package pkg ON sr.Package_ID = pkg.Package_ID
-    LEFT JOIN request_status rs ON sr.Request_Status_ID = rs.Request_Status_ID
-    LEFT JOIN payment p ON sr.Request_ID = p.Request_ID
-    WHERE sr.Client_ID = ?
-    GROUP BY sr.Request_ID
-    ORDER BY sr.Request_ID DESC
-");
-$stmt->execute([$client_id]);
-$payments = $stmt->fetchAll();
+$invoices = [];
+try {
+    $stmt = $db->prepare("
+        SELECT 
+            sr.Request_ID,
+            COALESCE(et.Name, 'General Event') AS event_type,
+            COALESCE(pkg.Name, 'Custom Package') AS package_name,
+            COALESCE(pkg.Price, 0.00) AS total_cost,
+            COALESCE(pay_totals.total_paid, 0.00) AS total_paid
+        FROM service_request sr
+        LEFT JOIN event_type et ON sr.Event_Type_ID = et.Event_Type_ID
+        LEFT JOIN package pkg ON sr.Package_ID = pkg.Package_ID
+        LEFT JOIN (
+            SELECT Request_ID, SUM(Amount) AS total_paid
+            FROM payment
+            GROUP BY Request_ID
+        ) pay_totals ON sr.Request_ID = pay_totals.Request_ID
+        WHERE sr.Client_ID = :uid
+        ORDER BY sr.Request_ID DESC
+    ");
+    $stmt->execute(['uid' => $currentUserId]);
+    $invoices = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {
+    $errorMessage = "Query Error: " . $e->getMessage();
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Payments - Client Portal</title>
-    <link rel="stylesheet" href="client-payments.css">
+    <title>Invoices & Payments - Client Portal</title>
+    <link rel="stylesheet" href="auth.css">
+    <style>
+        body { background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; }
+        .top-nav { background: #1e1e2d; color: #fff; padding: 14px 40px; display: flex; align-items: center; justify-content: space-between; }
+        .nav-left { display: flex; align-items: center; gap: 12px; }
+        .portal-title { font-weight: 700; font-size: 15px; color: #ffffff; letter-spacing: 0.2px; }
+        .nav-links { display: flex; align-items: center; }
+        .nav-links a { font-size: 11px; font-weight: 700; color: #92929f; text-decoration: none; letter-spacing: 0.8px; text-transform: uppercase; transition: color 0.2s; position: relative; padding-bottom: 4px; margin-right: 15px; }
+        .nav-links a:hover { color: #ffffff; }
+        .nav-links a.active { color: #ffffff; border-bottom: 2px solid #ffffff; }
+        .nav-right { display: flex; align-items: center; gap: 14px; }
+        .user-avatar { width: 32px; height: 32px; background: #3b82f6; color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; }
+        .btn-logout { font-size: 13px; font-weight: 700; color: #f87171; text-decoration: none; }
+        .portal-container { max-width: 1050px; margin: 36px auto; padding: 0 20px; }
+        .page-title { font-size: 26px; font-weight: 800; color: #0f172a; margin-bottom: 24px; text-align: center; }
+        .data-card { background: #fff; border-radius: 12px; padding: 28px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); border: 1px solid #e2e8f0; }
+        .data-table { width: 100%; border-collapse: collapse; }
+        .data-table th, .data-table td { padding: 14px 16px; text-align: left; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+        .data-table th { background-color: #f8fafc; font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: 0.5px; }
+        .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; display: inline-block; }
+        .status-unpaid { background: #fee2e2; color: #991b1b; }
+        .status-paid { background: #dcfce7; color: #166534; }
+        .status-partial { background: #fef3c7; color: #92400e; }
+        .pay-form { display: flex; gap: 6px; align-items: center; }
+        .input-amt { width: 90px; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; }
+        .select-method { padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; background: #fff; }
+        .btn-pay { background: #10b981; color: #fff; border: none; padding: 6px 14px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer; }
+        .alert-error { background: #fee2e2; border: 1px solid #fca5a5; color: #991b1b; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; font-weight: 600; }
+        .alert-success { background: #dcfce7; border: 1px solid #86efac; color: #166534; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; font-weight: 600; }
+    </style>
 </head>
 <body>
 
-    <header class="navbar">
-        <div class="brand">
-            <div class="logo-box">LOGO</div>
+    <header class="top-nav">
+        <div class="nav-left">
+            <img src="logo.svg" alt="Logo" width="34" height="34" style="display:block;width:34px;height:34px;">
             <span class="portal-title">Client Portal</span>
         </div>
-
-        <nav class="navigation">
-            <a href="client-request.php">BOOK EVENT</a>
-            <a href="client-messages.php">MESSAGES</a>
+        <nav class="nav-links">
+            <a href="client-services.php">SERVICES</a>
+            <a href="client-request.php">BOOK SERVICE</a>
             <a href="client-payments.php" class="active">MY PAYMENTS</a>
+            <a href="client-deliverables.php">GALLERY</a>
+            <a href="client-reviews.php">REVIEWS</a>
+            <a href="client-messages.php">MESSAGES</a>
         </nav>
-
-        <div class="nav-user-actions">
+        <div class="nav-right">
             <div class="user-avatar">C</div>
-            <a href="logout.php" class="logout-link">LOGOUT</a>
+            <a href="logout.php" class="btn-logout">Logout</a>
         </div>
     </header>
 
-    <main class="page-container">
-        <h2>Invoices & Payment Records</h2>
+    <main class="portal-container">
+        <h1 class="page-title">Invoices & Payment Records</h1>
 
-        <?php if (!empty($_GET['success'])): ?>
-            <div class="alert alert-success">✓ <?= htmlspecialchars($_GET['success']) ?></div>
-        <?php endif; ?>
-        <?php if (!empty($_GET['error'])): ?>
-            <div class="alert alert-danger">⚠️ <?= htmlspecialchars($_GET['error']) ?></div>
+        <?php if (!empty($errorMessage)): ?>
+            <div class="alert-error">⚠️ <?= htmlspecialchars($errorMessage) ?></div>
         <?php endif; ?>
 
-        <div class="card">
-            <table>
+        <?php if (!empty($successMessage)): ?>
+            <div class="alert-success">✓ <?= htmlspecialchars($successMessage) ?></div>
+        <?php endif; ?>
+
+        <div class="data-card">
+            <table class="data-table">
                 <thead>
                     <tr>
-                        <th>Req #</th>
-                        <th>Event & Package</th>
-                        <th>Total Cost</th>
-                        <th>Amount Paid</th>
-                        <th>Balance Due</th>
-                        <th>Payment Status</th>
-                        <th>Submit Payment</th>
+                        <th>REQ #</th>
+                        <th>EVENT & PACKAGE</th>
+                        <th>TOTAL COST</th>
+                        <th>AMOUNT PAID</th>
+                        <th>BALANCE DUE</th>
+                        <th>PAYMENT STATUS</th>
+                        <th>SUBMIT PAYMENT</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if (!empty($payments)): ?>
-                        <?php foreach ($payments as $p): ?>
+                    <?php if (!empty($invoices)): ?>
+                        <?php foreach ($invoices as $inv): ?>
                             <?php 
-                                $total = floatval($p['package_price'] ?? 0);
-                                $paid = floatval($p['total_paid'] ?? 0);
-                                $balance = max(0, $total - $paid);
+                                $cost = floatval($inv['total_cost']);
+                                $paid = floatval($inv['total_paid']);
+                                $balance = max(0, $cost - $paid);
                                 
-                                $status_text = 'Unpaid';
-                                $badge_class = 'badge-unpaid';
-                                if ($paid >= $total && $total > 0) {
-                                    $status_text = 'Paid In Full';
-                                    $badge_class = 'badge-paid';
+                                $statusLabel = 'Unpaid';
+                                $statusClass = 'status-unpaid';
+                                if ($cost > 0 && $paid >= $cost) {
+                                    $statusLabel = 'Paid';
+                                    $statusClass = 'status-paid';
                                 } elseif ($paid > 0) {
-                                    $status_text = 'Partial Deposit';
-                                    $badge_class = 'badge-partial';
+                                    $statusLabel = 'Partial';
+                                    $statusClass = 'status-partial';
                                 }
                             ?>
                             <tr>
-                                <td><strong>#REQ-<?= str_pad($p['Request_ID'], 3, '0', STR_PAD_LEFT) ?></strong></td>
+                                <td><strong>#REQ-<?= str_pad($inv['Request_ID'], 3, '0', STR_PAD_LEFT) ?></strong></td>
                                 <td>
-                                    <strong><?= htmlspecialchars($p['event_type'] ?? 'N/A') ?></strong><br>
-                                    <small style="color: #6b7280;"><?= htmlspecialchars($p['package_name'] ?? '') ?></small>
+                                    <strong><?= htmlspecialchars($inv['event_type']) ?></strong><br>
+                                    <small style="color: #64748b;"><?= htmlspecialchars($inv['package_name']) ?></small>
                                 </td>
-                                <td>₱<?= number_format($total, 2) ?></td>
+                                <td>₱<?= number_format($cost, 2) ?></td>
                                 <td>₱<?= number_format($paid, 2) ?></td>
-                                <td><strong style="color: <?= $balance > 0 ? '#dc2626' : '#16a34a' ?>;">₱<?= number_format($balance, 2) ?></strong></td>
-                                <td><span class="status-badge <?= $badge_class ?>"><?= $status_text ?></span></td>
+                                <td style="color: <?= $balance > 0 ? '#dc2626' : '#166534' ?>; font-weight: 700;">₱<?= number_format($balance, 2) ?></td>
+                                <td>
+                                    <span class="status-badge <?= $statusClass ?>"><?= $statusLabel ?></span>
+                                </td>
                                 <td>
                                     <?php if ($balance > 0): ?>
-                                        <form action="process-client-payments.php" method="POST" class="payment-form">
-                                            <input type="hidden" name="request_id" value="<?= $p['Request_ID'] ?>">
-                                            <input type="number" name="amount" min="1" max="<?= $balance ?>" step="0.01" placeholder="Amount" required>
-                                            <select name="payment_method_id" required style="padding: 6px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 13px;">
-                                                <option value="" disabled selected>Method</option>
-                                                <?php foreach ($payment_methods as $pm): ?>
-                                                    <option value="<?= $pm['Payment_Method_ID'] ?>"><?= htmlspecialchars($pm['Method_Name'] ?? $pm['Name'] ?? 'Method ' . $pm['Payment_Method_ID']) ?></option>
-                                                <?php endforeach; ?>
+                                        <form method="POST" class="pay-form">
+                                            <input type="hidden" name="action" value="submit_payment">
+                                            <input type="hidden" name="request_id" value="<?= $inv['Request_ID'] ?>">
+                                            <input type="number" step="0.01" name="amount" class="input-amt" placeholder="Amount" max="<?= $balance ?>" required>
+                                            <select name="method" class="select-method">
+                                                <option value="GCash">GCash</option>
+                                                <option value="Bank Transfer">Bank Transfer</option>
+                                                <option value="Cash">Cash</option>
                                             </select>
                                             <button type="submit" class="btn-pay">Pay</button>
                                         </form>
                                     <?php else: ?>
-                                        <span style="color: #10b981; font-weight: 700; font-size: 13px;">✓ Settled</span>
+                                        <span style="color: #166534; font-size: 12px; font-weight: 700;">Fully Paid</span>
                                     <?php endif; ?>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="7" style="text-align: center; color: #6b7280;">No booking invoices found.</td>
+                            <td colspan="7" style="text-align: center; padding: 24px; color: #64748b;">No billing records or invoices found.</td>
                         </tr>
                     <?php endif; ?>
                 </tbody>

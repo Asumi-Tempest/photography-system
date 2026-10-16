@@ -36,10 +36,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {$db = getDBConnection();
 
             // 2. Insert into `client` table with Role_ID = 1
             $client_stmt =$db->prepare("
-                INSERT INTO `client` (`Client_ID`, `Fullname`, `Email`, `Phonenumber`, `Password_Hash`, `Role_ID`) 
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO `client` (`Client_ID`, `Fullname`, `Email`, `Phonenumber`, `Password_Hash`, `Role_ID`, `Username`) 
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             ");
-            $client_stmt->execute([$user_id,$full_name, $email,$phone, $hashed_password,$client_role_id]);
+            // Username is required and unique in the client table, so use the (unique) email
+            $client_stmt->execute([$user_id,$full_name, $email,$phone, $hashed_password,$client_role_id, $email]);
 
             $db->commit();
 

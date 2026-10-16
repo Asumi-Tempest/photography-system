@@ -1,7 +1,10 @@
 <?php
 require_once 'config.php';
 
-// Auth Guard - Client Access Only
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
     exit;
@@ -9,11 +12,9 @@ if (!isset($_SESSION['user_id'])) {
 
 $db = getDBConnection();
 
-// Fetch event types and packages for dropdowns
 $event_types = $db->query("SELECT Event_Type_ID, Name FROM event_type ORDER BY Name ASC")->fetchAll();
 $packages    = $db->query("SELECT Package_ID, Name, Price FROM package ORDER BY Name ASC")->fetchAll();
 
-// Get today's date and current time for HTML min restrictions
 $today_date = date('Y-m-d');
 $current_time = date('H:i');
 ?>
@@ -24,47 +25,50 @@ $current_time = date('H:i');
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Book Service - Client Portal</title>
     <link rel="stylesheet" href="client-request.css">
+    <style>
+        .top-nav { background: #1e1e2d; color: #fff; padding: 14px 40px; display: flex; align-items: center; justify-content: space-between; }
+        .nav-links a { font-size: 11px; font-weight: 700; color: #92929f; text-decoration: none; letter-spacing: 0.8px; text-transform: uppercase; margin-right: 15px; }
+        .nav-links a:hover { color: #ffffff; }
+        .nav-links a.active { color: #ffffff; border-bottom: 2px solid #ffffff; padding-bottom: 4px; }
+    </style>
 </head>
 <body>
 
-    <!-- Client Navigation Header -->
-    <header class="navbar">
-        <div class="brand">
-            <div class="logo-box">LOGO</div>
+    <header class="top-nav">
+        <div class="nav-left">
+            <img src="logo.svg" alt="Logo" width="34" height="34" style="display:block;width:34px;height:34px;">
             <span class="portal-title">Client Portal</span>
         </div>
 
-        <nav class="navigation">
+        <nav class="nav-links">
+            <a href="client-services.php">SERVICES</a>
             <a href="client-request.php" class="active">BOOK SERVICE</a>
             <a href="client-payments.php">MY PAYMENTS</a>
+            <a href="client-deliverables.php">GALLERY</a>
+            <a href="client-reviews.php">REVIEWS</a>
             <a href="client-messages.php">MESSAGES</a>
         </nav>
 
         <div class="nav-user-actions" style="display: flex; align-items: center; gap: 12px;">
-            <div class="user-avatar">C</div>
+            <div class="user-avatar" style="width: 32px; height: 32px; background: #3b82f6; color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px;">C</div>
             <a href="logout.php" style="color: #ff6b6b; font-weight: bold; text-decoration: none; font-size: 14px;">Logout</a>
         </div>
     </header>
 
     <main class="page-container" style="max-width: 800px; margin: 30px auto; padding: 0 20px;">
 
-        <!-- Success Alert Banner -->
         <?php if (!empty($_GET['success'])): ?>
-            <div class="alert alert-success" style="padding: 14px 18px; background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; border-radius: 8px; margin-bottom: 24px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
-                <span style="font-size: 18px;">✓</span>
-                <span><?= htmlspecialchars($_GET['success']) ?></span>
+            <div class="alert alert-success" style="padding: 14px 18px; background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; border-radius: 8px; margin-bottom: 24px; font-weight: 600;">
+                ✓ <?= htmlspecialchars($_GET['success']) ?>
             </div>
         <?php endif; ?>
 
-        <!-- Error Alert Banner -->
         <?php if (!empty($_GET['error'])): ?>
-            <div class="alert alert-danger" style="padding: 14px 18px; background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; border-radius: 8px; margin-bottom: 24px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
-                <span style="font-size: 18px;">⚠️</span>
-                <span><?= htmlspecialchars($_GET['error']) ?></span>
+            <div class="alert alert-danger" style="padding: 14px 18px; background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; border-radius: 8px; margin-bottom: 24px; font-weight: 600;">
+                ⚠️ <?= htmlspecialchars($_GET['error']) ?>
             </div>
         <?php endif; ?>
 
-        <!-- Booking Request Form Card -->
         <div class="card" style="background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
             <h2 style="margin-top: 0; margin-bottom: 20px;">Submit Service Request</h2>
             
@@ -97,7 +101,6 @@ $current_time = date('H:i');
                 <div style="display: flex; gap: 16px; margin-bottom: 16px;">
                     <div style="flex: 1;">
                         <label style="display: block; font-weight: 600; margin-bottom: 6px;">Preferred Date</label>
-                        <!-- Added min attribute to disable past calendar dates -->
                         <input type="date" id="preferred_date" name="preferred_date" min="<?= $today_date ?>" required style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc;">
                     </div>
                     <div style="flex: 1;">
@@ -122,37 +125,7 @@ $current_time = date('H:i');
 
             </form>
         </div>
-
     </main>
-
-    <!-- JS script to dynamically enforce time limits if today's date is picked -->
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const dateInput = document.getElementById('preferred_date');
-            const timeInput = document.getElementById('preferred_time');
-            const todayStr = "<?= $today_date ?>";
-            const currentTimeStr = "<?= $current_time ?>";
-
-            function updateMinTime() {
-                if (dateInput.value === todayStr) {
-                    timeInput.min = currentTimeStr;
-                    if (timeInput.value && timeInput.value < currentTimeStr) {
-                        timeInput.value = currentTimeStr;
-                    }
-                } else {
-                    timeInput.removeAttribute('min');
-                }
-            }
-
-            dateInput.addEventListener('change', updateMinTime);
-            timeInput.addEventListener('change', function() {
-                if (dateInput.value === todayStr && timeInput.value < currentTimeStr) {
-                    alert('Please select a time in the future.');
-                    timeInput.value = currentTimeStr;
-                }
-            });
-        });
-    </script>
 
 </body>
 </html>

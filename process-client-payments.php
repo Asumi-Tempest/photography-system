@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $payment_method_id = $firstMethod ? intval($firstMethod['Payment_Method_ID']) : 1;
     }
 
-    if ($request_id > 0 && $amount_paid > 0) {
+    if ($request_id > 0 && $amount_paid > 0 && clientOwnsRequest($db, $request_id)) {
         // Determine column name dynamically
         $paymentColumn = 'Amount';
         try {

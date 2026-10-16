@@ -46,7 +46,7 @@ try {
 
     <header class="navbar">
         <div class="brand">
-            <div class="logo-box">LOGO</div>
+            <img src="logo.svg" alt="Logo" width="34" height="34" style="display:block;width:34px;height:34px;">
             <span>Client Portal</span>
         </div>
         <nav class="navigation">

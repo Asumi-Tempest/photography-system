@@ -26,7 +26,7 @@ $error = $_GET['error'] ?? '';
     <!-- Persistent Top Navigation Bar -->
     <header class="top-nav">
         <div class="nav-left">
-            <div class="nav-logo">LOGO</div>
+            <img src="logo.svg" alt="Logo" width="34" height="34" style="display:block;width:34px;height:34px;">
             <span class="portal-title">Client Portal</span>
         </div>
         <nav class="nav-links">

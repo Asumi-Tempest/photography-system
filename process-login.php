@@ -3,39 +3,40 @@ require_once 'config.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $db = getDBConnection();
-
-    $email    = trim($_POST['email'] ?? '');
-    $password = $_POST['password'] ?? '';
+    
+    $email = trim($_POST['email'] ?? '');
+    $password = trim($_POST['password'] ?? '');
 
     if (!empty($email) && !empty($password)) {
-        $stmt = $db->prepare("
-            SELECT User_ID, Full_Name, Email, Password_Hash, Role 
-            FROM User 
-            WHERE Email = ?
-        ");
+        // Query user table
+        $stmt = $db->prepare("SELECT * FROM user WHERE Email = ? LIMIT 1");
         $stmt->execute([$email]);
         $user = $stmt->fetch();
 
-        if ($user && password_verify($password, $user['Password_Hash'])) {
-            $_SESSION['user_id']   = $user['User_ID'];
-            $_SESSION['user_name'] = $user['Full_Name'];
-            $_SESSION['user_email']= $user['Email'];
-            $_SESSION['user_role'] = $user['Role'];
+        if ($user) {
+            // Support Password_Hash, Password, or password column variants
+            $dbPassword = $user['Password_Hash'] ?? $user['Password'] ?? $user['password'] ?? '';
 
-            // Route based on role using your exact file tree names
-            if ($user['Role'] === 'Admin' || $user['Role'] === 'Photographer') {
-                header('Location: photographer-dashboard.php');
-            } else {
-                header('Location: client-request.php');
+            // Verify hashed password or plain-text match
+            if (password_verify($password, $dbPassword) || $password === $dbPassword) {
+                $_SESSION['user_id']   = $user['User_ID'];
+                $_SESSION['email']     = $user['Email'];
+                $_SESSION['user_role'] = $user['Role'];
+
+                $role = strtolower($user['Role']);
+                if ($role === 'admin' || $role === 'photographer') {
+                    header('Location: photographer-dashboard.php');
+                } else {
+                    header('Location: client-request.php');
+                }
+                exit;
             }
-            exit;
         }
     }
 
-    header('Location: login.php?error=Invalid email or password.');
+    header('Location: login.php?error=' . urlencode('Invalid email or password.'));
     exit;
 }
 
 header('Location: login.php');
 exit;
-?>

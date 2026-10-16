@@ -1,5 +1,6 @@
 <?php
 require_once 'config.php';
+requireStaff(); // staff-only page
 
 // Auth Guard
 if (!isset($_SESSION['user_id'])) {
